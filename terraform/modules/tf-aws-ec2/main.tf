@@ -11,7 +11,6 @@ data "aws_ami" "ec2_ami" {
   }
 }
 
-
 # data "template_file" "user_data" { // EC2 cluster instances - booting script
 #   template            = "${file("${path.module}/task-definitions/user_data.sh.tpl")}"
 #
@@ -26,7 +25,7 @@ resource "aws_launch_configuration" "launch_conf" {
   name_prefix             = "${var.name}-"
   image_id                = "${data.aws_ami.ec2_ami.id}"
   # iam_instance_profile    = "${aws_iam_instance_profile.instance_profile.name}"
-  # security_groups         = ["${aws_security_group.jenkins.id}"]
+  security_groups         = ["${var.security_groups}"]
   instance_type           = "${var.instance_type}"
   # key_name                = "snipeit-demo"
   # user_data               = "${data.template_file.user_data.rendered}"
@@ -39,7 +38,7 @@ resource "aws_launch_configuration" "launch_conf" {
 resource "aws_autoscaling_group" "asg" {
   name                    = "${var.name}_asg"
   launch_configuration    = "${aws_launch_configuration.launch_conf.name}"
-  vpc_zone_identifier     = ["vpc-36d5f350"]
+  vpc_zone_identifier     = ["vpc-******"]
   desired_capacity        = "${var.asg_size}"
   min_size                = "${var.asg_size}"
   max_size                = "${var.asg_size}"
