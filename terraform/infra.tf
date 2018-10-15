@@ -1,7 +1,7 @@
 resource "aws_security_group" "jenkins_sg" {
   name        = "jenkins"
   description = "Allow all inbound traffic"
-  vpc_id      = "vpc-"
+  vpc_id      = "vpc-804cdbe8"
 
   ingress {
     from_port   = 22
@@ -28,7 +28,7 @@ resource "aws_security_group" "jenkins_sg" {
 resource "aws_security_group" "openvpn_sg" {
   name        = "openvpn"
   description = "Allow all inbound traffic"
-  vpc_id      = "vpc-"
+  vpc_id      = "vpc-804cdbe8"
 
   ingress {
     from_port   = 22
