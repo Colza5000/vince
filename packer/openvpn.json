@@ -1,0 +1,42 @@
+{
+  "variables": {
+    "aws_region": "eu-west-2",
+    "aws_access_key": "",
+    "aws_secret_key": ""
+  },
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "region": "eu-west-2",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "ubuntu/images/*ubuntu-bionic-18.04-amd64-server-*",
+          "root-device-type": "ebs"
+        },
+        "owners": ["099720109477"],
+        "most_recent": true
+      },
+      "ami_name": "OpenVPN-den-{{isotime \"2018-01-01\"}}",
+      "ami_description": "OPenVPN on Ubuntu 18.04",
+      "ena_support": "true",
+      "instance_type": "t2.medium",
+      "ssh_username": "ubuntu",
+      "tags": {
+        "OS Version": "Ubuntu 18.04"
+      }
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "ansible",
+      "playbook_file": "../ansible/openvpn.yml",
+      "extra_arguments": [
+        "--extra-vars",
+        "{\"ansible_python_interpreter\": \"/usr/bin/env python3\"}"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+- hosts: all
+  become: true
+  tasks:
+    - name: Run the equivalent of "apt-get update" as a separate step
+      apt:
+        update_cache: yes
+
+    - name: install openvpn
+      apt: 
+        name: openvpn
+        state: latest
+        update_cache: yes
+    
+    - name: wget easy-rsa
+      get_url:
+        url: https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.4/EasyRSA-3.0.4.tgz
+        dest: /opt/EasyRSA-3.0.4.tgz
+
+    - name: Extract EasyRSA-3.0.4.tgz
+      unarchive: 
+        src: /opt/EasyRSA-3.0.4.tgz
+        dest: /opt
+        remote_src: yes
+        
+    - name: Copy vars file
+      copy:
+        src: ./files/vars
+        dest: /opt/EasyRSA-3.0.4/vars
+
+    ####### CREATION KEYS AND CERTS
+
+    - name: Run init-pki
+      command: /opt/EasyRSA-3.0.4/easyrsa init-pki
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+
+    - stat:
+        path: /opt/EasyRSA-3.0.4/pki
+      register: pki
+
+    - debug:
+        msg: "pki exists"
+      when: pki
+
+    - name: Build ca
+      command: /opt/EasyRSA-3.0.4/easyrsa --batch build-ca nopass
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+      
+    - name: Create server.key
+      command: /opt/EasyRSA-3.0.4/easyrsa --batch gen-req server nopass
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+
+    - name: Copy server.key to openvpn
+      copy:
+        src: /opt/EasyRSA-3.0.4/pki/private/server.key
+        dest: /etc/openvpn/
+        remote_src: yes
+
+    - name: Sign server.req
+      command: /opt/EasyRSA-3.0.4/easyrsa --batch sign-req server server
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+
+    - name: Copy server.crt into openvpn path
+      copy:
+        src: /opt/EasyRSA-3.0.4/pki/issued/server.crt
+        dest: /etc/openvpn
+        remote_src: yes
+
+    - name: Copy ca.crt into openvpn path
+      copy:
+        src: /opt/EasyRSA-3.0.4/pki/ca.crt
+        dest: /etc/openvpn
+        remote_src: yes
+
+    - name: Create Diffie-Hellman key
+      command: /opt/EasyRSA-3.0.4/easyrsa gen-dh
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+
+    - name: Gen HMAC signature
+      command: openvpn --genkey --secret ta.key
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+    
+    - name: Copy ta.key and dh.pem to openvpn
+      command: cp /opt/EasyRSA-3.0.4/ta.key /opt/EasyRSA-3.0.4/pki/dh.pem /etc/openvpn/
+
+    - file:
+        path: /opt/client-configs/keys
+        state: directory
+        mode: 0700
+
+    - name: Replace CN name in vars
+      command: sed -i 's/OPVserver/Client/g' /opt/EasyRSA-3.0.4/vars
+
+    - name: Generate client key
+      command: /opt/EasyRSA-3.0.4/easyrsa --batch gen-req client1 nopass
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+    
+    - name: Copy client key
+      copy:
+        src: /opt/EasyRSA-3.0.4/pki/private/client1.key
+        dest: /opt/client-configs/keys/
+        remote_src: yes
+
+    # - name: Import client key
+    #   command: /opt/EasyRSA-3.0.4/easyrsa import-req /opt/EasyRSA-3.0.4/pki/reqs/client1.req client1
+    #   args:
+    #     chdir: /opt/EasyRSA-3.0.4
+
+    - name: Sign client cert
+      command: /opt/EasyRSA-3.0.4/easyrsa --batch sign-req client client1
+      args:
+        chdir: /opt/EasyRSA-3.0.4
+
+    - name: Copy signed cert
+      copy:
+        src: /opt/EasyRSA-3.0.4/pki/issued/client1.crt
+        dest: /opt/client-configs/keys/
+        remote_src: yes
+
+    - name: Copy ta.key to client keys
+      copy:
+        src: /opt/EasyRSA-3.0.4/ta.key
+        dest: /opt/client-configs/keys/
+        remote_src: yes
+
+    - name: Copy ca.crt to client keys
+      copy:
+        src: /etc/openvpn/ca.crt
+        dest: /opt/client-configs/keys/
+        remote_src: yes
+
+    ####### END OF CREATION OF KEYS AND CERTS
+
+    - name: Copy server.conf
+      copy:
+        src: ./files/server.conf
+        dest: /etc/openvpn/server.conf
+    
+    - name: Copy sysctl.conf
+      copy:
+        src: ./files/sysctl.conf
+        dest: /etc/sysctl.conf
+    
+    - name: Read sysctl
+      command: sysctl -p
+    
+    - name: Copy before.rules
+      copy:
+        src: ./files/before.rules
+        dest: /etc/ufw/before.rules
+    
+    - name: Copy ufw
+      copy:
+        src: ./files/ufw
+        dest: /etc/default/ufw
+    
+    # - name: Allow with ufw
+    #   command: "sudo ufw allow 1194/udp ; sudo ufw allow OpenSSH"
+
+    # - name: Restart ufw
+    #   command: "sudo ufw disable ; sudo ufw enable"
+    
+    - name: Start OpenVPN
+      command: "systemctl enable openvpn@server"
+
+#   roles:
+#   - Stouts.openvpn
+
+#   vars:
+#     openvpn_use_pam: yes
+#     openvpn_clients: [myvpn]
+#     openvpn_use_pam_users:
+#     - { name: user1, password: password1 }
+
