@@ -17,6 +17,7 @@ resource "aws_launch_configuration" "launch_conf" {
   security_groups         = ["${var.security_groups}"]
   instance_type           = "${var.instance_type}"
   key_name                = "${var.key_name}"
+  associate_public_ip_address = false
 
   lifecycle {
     create_before_destroy = true
