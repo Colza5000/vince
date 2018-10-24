@@ -19,7 +19,7 @@
         "owners": ["099720109477"],
         "most_recent": true
       },
-      "ami_name": "OpenVPN-den-{{isotime \"2018-01-01\"}}",
+      "ami_name": "OpenVPN-den-{{isotime \"2006-01-02\"}}",
       "ami_description": "OPenVPN on Ubuntu 18.04",
       "ena_support": "true",
       "instance_type": "t2.medium",

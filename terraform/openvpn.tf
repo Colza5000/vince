@@ -11,7 +11,7 @@
 module "openvpn" {
   source           = "modules/open-vpn/"
   create           = true
-  ami_id           = "ami-0886c7d045a7b6ac9"
+  ami_id           = "ami-0124f5d70260f2569"
   vpc_id           = "vpc-804cdbe8"
   instance_type    = "t2.medium"
   key_name         = "colinmac"

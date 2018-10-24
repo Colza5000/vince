@@ -54,6 +54,25 @@ resource "aws_security_group" "openvpn" {
   }
 }
 
+data "template_file" "openvpn_script" {
+  template = "${file("${path.module}/files/init.sh")}"
+
+  # vars {
+  #   elastic_address = "${aws_instance.openvpn.public_ip}"
+  # }
+}
+
+data "template_cloudinit_config" "openvpn_config" {
+  gzip          = true
+  base64_encode = true
+
+  part {
+    filename     = "init.cfg"
+    content_type = "text/x-shellscript"
+    content      = "${data.template_file.openvpn_script.rendered}"
+  }
+}
+
 resource "aws_instance" "openvpn" {
   count = "${var.create ? 1 : 0}"
 
@@ -64,6 +83,7 @@ resource "aws_instance" "openvpn" {
   key_name               = "${var.key_name}"
   vpc_security_group_ids = ["${aws_security_group.openvpn.id}"]
   monitoring             = true
+  user_data              = "${data.template_cloudinit_config.openvpn_config.rendered}"
 
   tags {
     Name        = "OpenVPN"

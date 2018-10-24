@@ -135,6 +135,11 @@
         dest: /opt/client-configs/keys/
         remote_src: yes
 
+    - name: Copy client.conf
+      copy:
+        src: ./files/client.conf
+        dest: /opt/client-configs/base.conf
+
     ####### END OF CREATION OF KEYS AND CERTS
 
     - name: Copy server.conf
@@ -159,22 +164,13 @@
       copy:
         src: ./files/ufw
         dest: /etc/default/ufw
-    
-    # - name: Allow with ufw
-    #   command: "sudo ufw allow 1194/udp ; sudo ufw allow OpenSSH"
 
-    # - name: Restart ufw
-    #   command: "sudo ufw disable ; sudo ufw enable"
+    - name: Add make_config.sh to create .ovpn file
+      copy:
+        src: ./files/make_config.sh
+        dest: /opt/client-configs/
+        mode: 0700
     
     - name: Start OpenVPN
       command: "systemctl enable openvpn@server"
-
-#   roles:
-#   - Stouts.openvpn
-
-#   vars:
-#     openvpn_use_pam: yes
-#     openvpn_clients: [myvpn]
-#     openvpn_use_pam_users:
-#     - { name: user1, password: password1 }
 
