@@ -4,4 +4,4 @@
   <img src="misc/vince.jpeg">
 </p>
 
-Spin up Jenkins
+Create OpenVPN AMI
