@@ -1,176 +1,52 @@
+# Ansible playbook to provision OpenVPN on a remote host.
+
 - hosts: all
-  become: true
-  tasks:
-    - name: Run the equivalent of "apt-get update" as a separate step
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  pre_tasks:
+    - name: Wait up to 300 seconds (5m) for EC2 bootstrap
+      wait_for_connection:
+        timeout: 300
+    - name: Gather facts
+      setup:
+    - name: Update and upgrade apt packages
+      become: true
       apt:
+        upgrade: yes
         update_cache: yes
+  roles:
+    - kyl191.openvpn
+  vars:
+    openvpn_proto: tcp
+    openvpn_dualstack: false
+    # network (without cidr) - ensure this DOES NOT clash with any subnets in AWS
+    openvpn_server_network: "10.99.0.0"
+    # ip addr/dns name that gets added into client configs
+    openvpn_server_hostname: vpn.balded-gibbon.com
+    # disable this as it only works with Windows
+    openvpn_client_register_dns: false
+    manage_firewall_rules: false
+    # this allows multiple clients to connect using the same key
+    openvpn_duplicate_cn: true
+    clients:
+      - talbotj
 
-    - name: install openvpn
-      apt: 
-        name: openvpn
-        state: latest
-        update_cache: yes
-    
-    - name: wget easy-rsa
-      get_url:
-        url: https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.4/EasyRSA-3.0.4.tgz
-        dest: /opt/EasyRSA-3.0.4.tgz
+  tasks:
+    - name: Grab a list of VPN configuration files
+      find: paths="/etc/openvpn/" recurse=no patterns="*.ovpn"
+      register: ovpn_config
 
-    - name: Extract EasyRSA-3.0.4.tgz
-      unarchive: 
-        src: /opt/EasyRSA-3.0.4.tgz
-        dest: /opt
-        remote_src: yes
-        
-    - name: Copy vars file
-      copy:
-        src: ./files/vars
-        dest: /opt/EasyRSA-3.0.4/vars
+    - name: Download VPN configuration tarball from the server
+      fetch:
+        src: "{{ item.path }}"
+        dest: ./
+        flat: yes
+      with_items: "{{ ovpn_config.files }}"
 
-    ####### CREATION KEYS AND CERTS
-
-    - name: Run init-pki
-      command: /opt/EasyRSA-3.0.4/easyrsa init-pki
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-
-    - stat:
-        path: /opt/EasyRSA-3.0.4/pki
-      register: pki
-
-    - debug:
-        msg: "pki exists"
-      when: pki
-
-    - name: Build ca
-      command: /opt/EasyRSA-3.0.4/easyrsa --batch build-ca nopass
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-      
-    - name: Create server.key
-      command: /opt/EasyRSA-3.0.4/easyrsa --batch gen-req server nopass
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-
-    - name: Copy server.key to openvpn
-      copy:
-        src: /opt/EasyRSA-3.0.4/pki/private/server.key
-        dest: /etc/openvpn/
-        remote_src: yes
-
-    - name: Sign server.req
-      command: /opt/EasyRSA-3.0.4/easyrsa --batch sign-req server server
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-
-    - name: Copy server.crt into openvpn path
-      copy:
-        src: /opt/EasyRSA-3.0.4/pki/issued/server.crt
-        dest: /etc/openvpn
-        remote_src: yes
-
-    - name: Copy ca.crt into openvpn path
-      copy:
-        src: /opt/EasyRSA-3.0.4/pki/ca.crt
-        dest: /etc/openvpn
-        remote_src: yes
-
-    - name: Create Diffie-Hellman key
-      command: /opt/EasyRSA-3.0.4/easyrsa gen-dh
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-
-    - name: Gen HMAC signature
-      command: openvpn --genkey --secret ta.key
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-    
-    - name: Copy ta.key and dh.pem to openvpn
-      command: cp /opt/EasyRSA-3.0.4/ta.key /opt/EasyRSA-3.0.4/pki/dh.pem /etc/openvpn/
-
-    - file:
-        path: /opt/client-configs/keys
-        state: directory
-        mode: 0700
-
-    - name: Replace CN name in vars
-      command: sed -i 's/OPVserver/Client/g' /opt/EasyRSA-3.0.4/vars
-
-    - name: Generate client key
-      command: /opt/EasyRSA-3.0.4/easyrsa --batch gen-req client1 nopass
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-    
-    - name: Copy client key
-      copy:
-        src: /opt/EasyRSA-3.0.4/pki/private/client1.key
-        dest: /opt/client-configs/keys/
-        remote_src: yes
-
-    # - name: Import client key
-    #   command: /opt/EasyRSA-3.0.4/easyrsa import-req /opt/EasyRSA-3.0.4/pki/reqs/client1.req client1
-    #   args:
-    #     chdir: /opt/EasyRSA-3.0.4
-
-    - name: Sign client cert
-      command: /opt/EasyRSA-3.0.4/easyrsa --batch sign-req client client1
-      args:
-        chdir: /opt/EasyRSA-3.0.4
-
-    - name: Copy signed cert
-      copy:
-        src: /opt/EasyRSA-3.0.4/pki/issued/client1.crt
-        dest: /opt/client-configs/keys/
-        remote_src: yes
-
-    - name: Copy ta.key to client keys
-      copy:
-        src: /opt/EasyRSA-3.0.4/ta.key
-        dest: /opt/client-configs/keys/
-        remote_src: yes
-
-    - name: Copy ca.crt to client keys
-      copy:
-        src: /etc/openvpn/ca.crt
-        dest: /opt/client-configs/keys/
-        remote_src: yes
-
-    - name: Copy client.conf
-      copy:
-        src: ./files/client.conf
-        dest: /opt/client-configs/base.conf
-
-    ####### END OF CREATION OF KEYS AND CERTS
-
-    - name: Copy server.conf
-      copy:
-        src: ./files/server.conf
-        dest: /etc/openvpn/server.conf
-    
-    - name: Copy sysctl.conf
-      copy:
-        src: ./files/sysctl.conf
-        dest: /etc/sysctl.conf
-    
-    - name: Read sysctl
-      command: sysctl -p
-    
-    - name: Copy before.rules
-      copy:
-        src: ./files/before.rules
-        dest: /etc/ufw/before.rules
-    
-    - name: Copy ufw
-      copy:
-        src: ./files/ufw
-        dest: /etc/default/ufw
-
-    - name: Add make_config.sh to create .ovpn file
-      copy:
-        src: ./files/make_config.sh
-        dest: /opt/client-configs/
-        mode: 0700
-    
-    - name: Start OpenVPN
-      command: "systemctl enable openvpn@server"
-
+    - name: Install aws-cli
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+        - awscli
