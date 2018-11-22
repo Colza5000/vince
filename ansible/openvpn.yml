@@ -30,7 +30,7 @@
     # this allows multiple clients to connect using the same key
     openvpn_duplicate_cn: true
     clients:
-      - talbotj
+      - vpnclient
 
   tasks:
     - name: Grab a list of VPN configuration files
