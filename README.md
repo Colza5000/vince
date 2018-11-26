@@ -9,10 +9,11 @@ Create OpenVPN AMI
 Following variables need to be set
 
 ```
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-AWS_VPC_ID
-AWS_AMI_USERS
-BUILD_DATE
+AWS_ACCESS_KEY_ID=abcxyz
+AWS_SECRET_ACCESS_KEY=abcxyz
+AWS_VPC_ID=vpc-abcxyz
+AWS_AMI_USERS=colza5000
+BUILD_DATE=$(date +%d%m%y)
 ```
+Run
 `packer build`
