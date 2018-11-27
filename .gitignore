@@ -4,3 +4,5 @@ terraform/terraform.tfstate.backup
 terraform/terraform.tfstate
 terraform/.DS_Store
 .DS_Store
+ansible/openvpn.retry
+ansible/vpnclient-default.ovpn
